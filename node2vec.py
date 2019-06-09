@@ -148,7 +148,7 @@ def main():
     # nx.draw(g, with_labels=True)
     
     # DFS
-    p, q = 1.0, 0.5
+    p, q = 1.0, 0.1
     wv, dfs_walks = get_wv(g, id_list, p=p, q=q)
     plt.subplot(121)
     x, y = normalization(wv[:,0], wv[:,1])
@@ -158,7 +158,7 @@ def main():
     plt.title('DFS: p=%.1f, q=%.1f'%(p, q), fontsize='large', fontweight='bold')
 
     # BFS
-    p, q = 1.0, 2.0
+    p, q = 1.0, 10.0
     wv, bfs_walks = get_wv(g, id_list, p=p, q=q)
     plt.subplot(122)
     x, y = normalization(wv[:,0], wv[:,1])
