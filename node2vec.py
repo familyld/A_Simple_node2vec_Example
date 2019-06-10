@@ -11,48 +11,43 @@ import os
 from gensim.models import Word2Vec
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.manifold import TSNE
 
 sns.set()
-plt.figure(figsize=(18, 9))
 
-directed = False
-num_nodes = 26
-num_walks = 50
-walk_length = 20
+num_nodes = 30      # cross: 11, flow: 26, crab: 10, kite: 16, bridge: 15, flower: 30
+num_walks = 100
+walk_length = 10
 emb_size = 2
 iteration = 200
-path = './data.txt'
+path = './flower.txt' # cross.txt, flow.txt, crab.txt, kite.txt, bridge.txt, flower.txt
 
 def load_graph(filename):
-    if directed:
-        g = nx.DiGraph()
-    else:
-        g = nx.Graph()
+    g = nx.Graph()
     with open(filename, 'r') as f:
         line = f.readline()
         while line:
             line_split = line.split()
             src, dst = line_split[0], line_split[1]
             g.add_edge(src, dst)
-            g[src][dst]['weight'] = 1
+            if g[src][dst].get('weight') == None:
+                g[src][dst]['weight'] = 1
+            else:
+                g[src][dst]['weight'] += 1
             line = f.readline()
     return g
 
-def preprocess_transition_probs(g, directed=False, p=1, q=1):
+def preprocess_transition_probs(g, p=1, q=1):
     alias_nodes, alias_edges = {}, {};
     for node in g.nodes():
         probs = [g[node][nei]['weight'] for nei in sorted(g.neighbors(node))]
         norm_const = sum(probs)
         norm_probs = [float(prob) / norm_const for prob in probs]
         alias_nodes[node] = get_alias_nodes(norm_probs)
-
-    if directed:
-        for edge in g.edges():
-            alias_edges[edge] = get_alias_edges(g, edge[0], edge[1], p, q)
-    else:
-        for edge in g.edges():
-            alias_edges[edge] = get_alias_edges(g, edge[0], edge[1], p, q)
-            alias_edges[(edge[1], edge[0])] = get_alias_edges(g, edge[1], edge[0], p, q)
+    
+    for edge in g.edges():
+        alias_edges[edge] = get_alias_edges(g, edge[0], edge[1], p, q)
+        alias_edges[(edge[1], edge[0])] = get_alias_edges(g, edge[1], edge[0], p, q)
 
     return alias_nodes, alias_edges
 
@@ -118,7 +113,7 @@ def node2vec_walk(g, start, alias_nodes, alias_edges, walk_length=30):
     return path 
 
 def get_wv(g, id_list, p=1, q=1):
-    alias_nodes, alias_edges = preprocess_transition_probs(g, directed, p, q)
+    alias_nodes, alias_edges = preprocess_transition_probs(g, p, q)
 
     walks = []
     idx_total = []
@@ -128,12 +123,14 @@ def get_wv(g, id_list, p=1, q=1):
 
         for node in [id_list[j] for j in r]:
             walks.append(node2vec_walk(g, node, alias_nodes, alias_edges, walk_length))
-    model = Word2Vec(walks, size=emb_size, min_count=0, sg=1, iter=iteration)
+    model = Word2Vec(walks, size=emb_size, min_count=0, sg=1, window=5, iter=iteration)
 
     wv = []
-    for i in range(26):
+    for i in range(num_nodes):
         wv.append(model.wv.get_vector(str(i)))
     wv = np.array(wv)
+    # model = TSNE(perplexity=5)
+    # wv = model.fit_transform(wv)
     return wv, walks
 
 def normalization(a, b):
@@ -145,15 +142,17 @@ def main():
     id_list = list(range(num_nodes))
     id_list = [str(id) for id in id_list]
     g = load_graph(path)
-    # nx.draw(g, with_labels=True)
+    plt.figure()
+    nx.draw(g, with_labels=True)
     
+    plt.figure(figsize=(18, 9))
     # DFS
     p, q = 1.0, 0.1
     wv, dfs_walks = get_wv(g, id_list, p=p, q=q)
     plt.subplot(121)
     x, y = normalization(wv[:,0], wv[:,1])
     plt.plot(x, y, 'o')
-    for n in range(26):
+    for n in range(num_nodes):
         plt.text(x[n], y[n], str(n), ha='right', va='bottom', fontsize=12)
     plt.title('DFS: p=%.1f, q=%.1f'%(p, q), fontsize='large', fontweight='bold')
 
@@ -163,7 +162,7 @@ def main():
     plt.subplot(122)
     x, y = normalization(wv[:,0], wv[:,1])
     plt.plot(x, y, 'o')
-    for n in range(26):
+    for n in range(num_nodes):
         plt.text(x[n], y[n], str(n), ha='right', va='bottom', fontsize=12)
     plt.title('BFS: p=%.1f, q=%.1f'%(p, q), fontsize='large', fontweight='bold')
 
